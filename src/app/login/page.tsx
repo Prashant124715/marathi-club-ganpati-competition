@@ -21,6 +21,18 @@ import { isAdminEmail } from '@/lib/adminConfig';
 
 // ── Google Sign-In Button ─────────────────────────────────────────────────────
 
+function isFirestoreOfflineError(err: unknown) {
+  const code = (err as { code?: string })?.code;
+  const message = err instanceof Error ? err.message : String(err ?? '');
+
+  return (
+    code === 'offline' ||
+    code === 'unavailable' ||
+    message.toLowerCase().includes('client is offline') ||
+    message.toLowerCase().includes('offline')
+  );
+}
+
 function GoogleSignInButton({ setError }: { setError: (msg: string) => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -46,9 +58,18 @@ function GoogleSignInButton({ setError }: { setError: (msg: string) => void }) {
       const assignedRole = userIsAdmin ? 'admin' : 'participant';
 
       const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
+      let userSnap: Awaited<ReturnType<typeof getDoc>> | null = null;
 
-      if (!userSnap.exists()) {
+      try {
+        userSnap = await getDoc(userRef);
+      } catch (err) {
+        if (!isFirestoreOfflineError(err)) {
+          throw err;
+        }
+        console.warn('Firestore is offline during Google sign-in; continuing without profile sync.', err);
+      }
+
+      if (userSnap && !userSnap.exists()) {
         // New user: create Firestore document with correct role
         await setDoc(userRef, {
           uid: user.uid,
@@ -57,21 +78,34 @@ function GoogleSignInButton({ setError }: { setError: (msg: string) => void }) {
           role: assignedRole,
           emailVerified: user.emailVerified,
           createdAt: serverTimestamp(),
+        }).catch((err) => {
+          if (!isFirestoreOfflineError(err)) {
+            throw err;
+          }
+          console.warn('Firestore offline while creating user profile; continuing login.', err);
         });
-      } else {
+      } else if (userSnap && userSnap.exists()) {
         // Returning user: sync emailVerified, and ensure admin emails keep admin role
-        const data = userSnap.data();
+        const data = userSnap.data() as {
+          emailVerified?: boolean;
+          role?: string;
+        } | undefined;
         const updates: Record<string, unknown> = {};
 
-        if (user.emailVerified && data.emailVerified !== true) {
+        if (user.emailVerified && data?.emailVerified !== true) {
           updates.emailVerified = true;
         }
         // If this is a known admin email but Firestore doc doesn't reflect that, fix it.
-        if (userIsAdmin && data.role !== 'admin') {
+        if (userIsAdmin && data?.role !== 'admin') {
           updates.role = 'admin';
         }
         if (Object.keys(updates).length > 0) {
-          await updateDoc(userRef, updates);
+          await updateDoc(userRef, updates).catch((err) => {
+            if (!isFirestoreOfflineError(err)) {
+              throw err;
+            }
+            console.warn('Firestore offline while updating user profile; continuing login.', err);
+          });
         }
       }
 
@@ -96,6 +130,18 @@ function GoogleSignInButton({ setError }: { setError: (msg: string) => void }) {
       if (code === 'auth/popup-blocked') {
         setError(
           'Pop-up was blocked by your browser. Please allow pop-ups for this site and try again.'
+        );
+      } else if (code === 'auth/unauthorized-domain') {
+        setError(
+          'This domain is not authorized in Firebase. Add localhost or your live domain in Authentication > Settings > Authorized domains.'
+        );
+      } else if (code === 'auth/operation-not-allowed') {
+        setError(
+          'Google sign-in is disabled in Firebase. Enable it in Authentication > Sign-in method > Google.'
+        );
+      } else if (code === 'auth/configuration-not-found') {
+        setError(
+          'Firebase Auth is not configured for Google sign-in. Enable Google in Firebase and refresh.'
         );
       } else if (code === 'auth/network-request-failed') {
         setError('Network error. Please check your connection and try again.');

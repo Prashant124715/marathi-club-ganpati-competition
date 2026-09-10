@@ -85,6 +85,46 @@ export const DEFAULT_COMPETITION_SETTINGS: CompetitionSettings = {
   votingDeadline: null,
 };
 
+let defaultDataPromise: Promise<void> | null = null;
+
+export async function ensureDefaultData(): Promise<void> {
+  if (defaultDataPromise) return defaultDataPromise;
+
+  defaultDataPromise = (async () => {
+    const categoryPromises = CATEGORY_SEEDS.map((cat) =>
+      getDoc(doc(db, COLLECTIONS.CATEGORIES, cat.id)).then((snap) => {
+        if (!snap.exists()) {
+          return setDoc(doc(db, COLLECTIONS.CATEGORIES, cat.id), {
+            ...cat,
+            createdAt: serverTimestamp(),
+          });
+        }
+        return Promise.resolve();
+      })
+    );
+
+    const settingsRef = doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOCS.COMPETITION);
+    const settingsSnap = await getDoc(settingsRef);
+
+    if (!settingsSnap.exists()) {
+      await setDoc(settingsRef, {
+        ...DEFAULT_COMPETITION_SETTINGS,
+        updatedAt: serverTimestamp(),
+        updatedBy: 'system',
+      });
+    }
+
+    await Promise.all(categoryPromises);
+  })();
+
+  try {
+    await defaultDataPromise;
+  } catch (error) {
+    defaultDataPromise = null;
+    throw error;
+  }
+}
+
 export async function getCompetitionSettings(): Promise<CompetitionSettings> {
   const docRef = doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOCS.COMPETITION);
   const snap = await getDoc(docRef);

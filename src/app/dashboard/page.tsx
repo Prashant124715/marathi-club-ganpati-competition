@@ -217,23 +217,21 @@ function ParticipantDashboardContent() {
     setLoading(true);
     setError('');
 
-    // Check if verification status updated
-    refreshUser().catch(() => {});
-
     try {
-      // 1. Fetch user doc for profile metadata
+      // Fetch independent dashboard data in parallel to reduce route latency.
       const userDocRef = doc(db, COLLECTIONS.USERS, user.uid);
-      const userSnap = await getDoc(userDocRef);
+      const submissionsQuery = query(
+        collection(db, COLLECTIONS.SUBMISSIONS),
+        where('participantId', '==', user.uid)
+      );
+      const [userSnap, snap] = await Promise.all([
+        getDoc(userDocRef),
+        getDocs(submissionsQuery),
+      ]);
       if (userSnap.exists()) {
         setProfile(userSnap.data() as AppUser);
       }
 
-      // 2. Fetch submissions for this participant
-      const q = query(
-        collection(db, COLLECTIONS.SUBMISSIONS),
-        where('participantId', '==', user.uid)
-      );
-      const snap = await getDocs(q);
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Submission));
 
       // Client-side sort by createdAt descending

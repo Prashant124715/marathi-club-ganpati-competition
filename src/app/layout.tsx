@@ -1,9 +1,17 @@
-import type { Metadata, Viewport } from "next";
-import { Inter, Rozha_One } from "next/font/google";
-import "./globals.css";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
-import { AuthProvider } from "@/contexts/AuthContext";
+import type { Metadata, Viewport } from 'next';
+import dynamic from 'next/dynamic';
+import { Inter, Rozha_One } from 'next/font/google';
+import './globals.css';
+import { Navbar } from '@/components/layout/Navbar';
+import { AuthProvider } from '@/contexts/AuthContext';
+
+const Footer = dynamic(
+  async () => (await import('@/components/layout/Footer')).Footer,
+  {
+    ssr: true,
+    loading: () => null,
+  }
+);
 
 const inter = Inter({
   variable: "--font-inter",

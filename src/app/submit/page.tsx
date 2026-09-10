@@ -46,6 +46,32 @@ const ALLOWED_TYPES = [
 ];
 const MAX_FILE_SIZE_MB = 50;
 
+function getSubmissionErrorMessage(error: unknown): string {
+  const code = (error as { code?: string })?.code;
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  if (
+    code === 'not-found' &&
+    message.toLowerCase().includes('database (default) does not exist')
+  ) {
+    return 'Submissions are temporarily unavailable because the Firestore database has not been created for this Firebase project. Please contact the administrator.';
+  }
+
+  if (code === 'permission-denied') {
+    return 'You do not have permission to submit this entry. Please make sure you are signed in and your account is allowed to participate.';
+  }
+
+  if (code === 'storage/unauthorized') {
+    return 'File upload is not authorized. Please sign in again and try once more.';
+  }
+
+  if (code === 'storage/quota-exceeded') {
+    return 'File upload is temporarily unavailable because storage capacity has been reached.';
+  }
+
+  return message || 'An unexpected error occurred. Please try again.';
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function SubmitForm() {
@@ -165,7 +191,7 @@ function SubmitForm() {
       setSuccess(true);
     } catch (err: unknown) {
       console.error(err);
-      setError((err as Error).message || 'An unexpected error occurred. Please try again.');
+      setError(getSubmissionErrorMessage(err));
     } finally {
       setLoading(false);
       setUploadProgress(0);

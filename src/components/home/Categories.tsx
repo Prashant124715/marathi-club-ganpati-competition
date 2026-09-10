@@ -1,7 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { Home, Video, BookOpen, GraduationCap, ArrowRight } from 'lucide-react';
 
 const categories = [
@@ -53,16 +50,10 @@ export function Categories() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-          {categories.map((category, index) => {
+          {categories.map((category) => {
             const Icon = category.icon;
             return (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1, duration: 0.5 }}
-              >
+              <div key={category.id} className="h-full">
                 <Link
                   href={`/category/${category.id}`}
                   className="group bg-white dark:bg-zinc-900 rounded-2xl p-6 sm:p-8 shadow-sm hover:shadow-xl transition-all border border-black/5 dark:border-white/5 cursor-pointer relative overflow-hidden flex flex-col h-full justify-between"
@@ -82,7 +73,7 @@ export function Categories() {
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-saffron to-burgundy transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
                 </Link>
-              </motion.div>
+              </div>
             );
           })}
         </div>

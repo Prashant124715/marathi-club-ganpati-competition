@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   COLLECTIONS,
@@ -26,14 +26,13 @@ export interface UseCompetitionSettingsReturn {
 
 export function useCompetitionSettings(): UseCompetitionSettingsReturn {
   const [settings, setSettings] = useState<CompetitionSettings>(DEFAULT_COMPETITION_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const docRef = doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOCS.COMPETITION);
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
+    getDoc(docRef)
+      .then((snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           setSettings({
@@ -48,15 +47,12 @@ export function useCompetitionSettings(): UseCompetitionSettingsReturn {
           setSettings(DEFAULT_COMPETITION_SETTINGS);
         }
         setLoading(false);
-      },
-      (err) => {
-        console.error('Error listening to competition settings:', err);
+      })
+      .catch((err) => {
+        console.error('Error fetching competition settings:', err);
         setError(err.message);
         setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+      });
   }, []);
 
   const submissionDeadlineDate = settings.submissionDeadline ? settings.submissionDeadline.toDate() : null;

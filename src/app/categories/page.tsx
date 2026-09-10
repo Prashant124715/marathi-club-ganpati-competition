@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, CATEGORY_SEEDS } from '@/lib/firestore';
-import type { Submission, CategorySlug } from '@/lib/types';
+import type { CategorySlug } from '@/lib/types';
 import { CategoryCard } from '@/components/gallery/CategoryCard';
 import { Loader2 } from 'lucide-react';
 
@@ -16,15 +16,19 @@ export default function CategoriesPage() {
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const snap = await getDocs(
-          query(collection(db, COLLECTIONS.SUBMISSIONS), where('status', '==', 'approved'))
+        const results = await Promise.all(
+          CATEGORY_SEEDS.map(async (category) => {
+            const count = await getCountFromServer(
+              query(
+                collection(db, COLLECTIONS.SUBMISSIONS),
+                where('status', '==', 'approved'),
+                where('categoryId', '==', category.id)
+              )
+            );
+            return [category.id, count.data().count] as const;
+          })
         );
-        const c: Partial<Record<CategorySlug, number>> = {};
-        snap.docs.forEach((d) => {
-          const cat = (d.data() as Submission).categoryId;
-          c[cat] = (c[cat] ?? 0) + 1;
-        });
-        setCounts(c);
+        setCounts(Object.fromEntries(results) as Partial<Record<CategorySlug, number>>);
       } catch (e) {
         console.error(e);
       } finally {
